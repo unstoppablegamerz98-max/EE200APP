@@ -237,7 +237,7 @@ def main():
     with st.sidebar:
         st.image("https://upload.wikimedia.org/wikipedia/en/thumb/1/1d/IIT_Kanpur_Logo.svg/200px-IIT_Kanpur_Logo.svg.png", width=80)
         st.markdown("## 🎵 Sonic Signatures")
-        st.markdown("**EE200 — Q3B**  \nIIT Kanpur | Dr. Tushar Sandhan")
+        st.markdown("**EE200**  \nIIT Kanpur | Dr. Tushar Sandhan")
         st.divider()
         mode = st.radio("**Mode**", ["🔍 Single-Clip", "📦 Batch"], index=0)
         st.divider()
