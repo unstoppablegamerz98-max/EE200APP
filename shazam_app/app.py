@@ -1,5 +1,5 @@
 """
-Q3B — Sonic Signatures: 'Zapp tain America'
+Sonic Signatures: 'Zapp tain America'
 EE200: Signals, Systems and Networks | IIT Kanpur
 Streamlit app: Single-clip mode + Batch mode
 """
@@ -259,7 +259,7 @@ def main():
                     padding:24px 32px;border-radius:12px;margin-bottom:24px'>
           <h1 style='color:white;margin:0;font-size:2rem'>🎵 Sonic Signatures</h1>
           <p style='color:#c5cae9;margin:4px 0 0'>
-            Q3B — EE200 Course Project &nbsp;|&nbsp; Audio Fingerprint Identifier
+            EE200 Course Project &nbsp;|&nbsp; Audio Fingerprint Identifier
           </p>
         </div>
         """,
@@ -319,7 +319,7 @@ def main():
                 df_scores["Match"] = df_scores["Song"].apply(
                     lambda s: "✅" if s == pred.replace("_"," ") else ""
                 )
-                st.dataframe(df_scores, use_container_width=True, hide_index=True)
+                st.dataframe(df_scores, width='stretch', hide_index=True)
 
             # Plots
             st.markdown("---")
@@ -327,7 +327,7 @@ def main():
             with st.spinner("Rendering plots…"):
                 fig = plot_results(y, f, t, Sdb, peaks, f_mask,
                                    scores, best_offsets, matches, pred)
-                st.pyplot(fig, use_container_width=True)
+                st.pyplot(fig, width='stretch')
                 plt.close(fig)
 
             # Individual plot tabs
@@ -340,7 +340,7 @@ def main():
                 ax1.set_xlabel("Time (s)"); ax1.set_ylabel("Frequency (kHz)")
                 ax1.set_title(f'Spectrogram of query clip', fontweight="bold")
                 plt.colorbar(im, ax=ax1, label="dB")
-                st.pyplot(fig1, use_container_width=True)
+                st.pyplot(fig1, width='stretch')
                 plt.close(fig1)
                 st.caption("Each column is one STFT window (N=2048 samples, ~93 ms). "
                            "Brighter = more energy at that frequency at that time.")
@@ -355,7 +355,7 @@ def main():
                 ax2.set_xlabel("Time (s)"); ax2.set_ylabel("Frequency (kHz)")
                 ax2.set_title(f"Constellation: {len(peaks)} local-maxima peaks", fontweight="bold")
                 plt.colorbar(im2, ax=ax2, label="dB")
-                st.pyplot(fig2, use_container_width=True)
+                st.pyplot(fig2, width='stretch')
                 plt.close(fig2)
                 st.caption("Cyan dots = strongest time-frequency peaks. Each will be "
                            "paired into hashes (f1, f2, Δt) for matching.")
@@ -385,7 +385,7 @@ def main():
                             ax_h.set_ylabel("Count", fontsize=6)
                             ax_h.tick_params(labelsize=6)
                             fig_h.tight_layout()
-                            col.pyplot(fig_h, use_container_width=True)
+                            col.pyplot(fig_h, width='stretch')
                             plt.close(fig_h)
                 st.caption("A true match produces a sharp spike; wrong songs stay flat and low.")
 
@@ -439,7 +439,7 @@ def main():
             )
             st.dataframe(
                 df_display[["filename", "Song Identified"]],
-                use_container_width=True, hide_index=True
+                width='stretch', hide_index=True
             )
 
             # Download button
@@ -450,7 +450,7 @@ def main():
                 file_name="results.csv",
                 mime="text/csv",
                 type="primary",
-                use_container_width=True,
+                width='stretch',
             )
 
             st.markdown("**Preview of results.csv:**")
