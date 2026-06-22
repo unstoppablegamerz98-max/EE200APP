@@ -63,6 +63,9 @@ def load_audio_bytes(data: bytes) -> tuple:
         n_new = int(len(y) * SR / sr)
         y = np.interp(np.linspace(0, len(y)-1, n_new),
                       np.arange(len(y)), y).astype(np.float32)
+    MAX_SECONDS = 15
+    if len(y) > SR * MAX_SECONDS:
+        y = y[: SR * MAX_SECONDS]
     return y, SR
 
 
@@ -87,7 +90,7 @@ def extract_peaks(Sdb, f, t):
     out = []
     for ti, cands in by_frame.items():
         cands.sort(key=lambda x: -x[0])
-        for _, ti2, fi in cands[:15]:
+        for _, ti2, fi in cands[:8]:
             out.append((ti2, fi))
     return out, f_mask
 
@@ -155,6 +158,9 @@ def fig_to_bytes(fig):
 
 
 def plot_results(y, f, t, Sdb, peaks, f_mask, scores, best_offsets, matches, prediction):
+    DISPLAY_STEP = 4
+    t_plot = t[::DISPLAY_STEP]
+    Sdb_plot = Sdb[f_mask, ::DISPLAY_STEP]
     fig = plt.figure(figsize=(16, 12))
     gs = gridspec.GridSpec(3, 2, figure=fig, hspace=0.45, wspace=0.35)
 
@@ -168,7 +174,7 @@ def plot_results(y, f, t, Sdb, peaks, f_mask, scores, best_offsets, matches, pre
 
     # ── 2. Spectrogram ───────────────────────────────────────────────────────
     ax1 = fig.add_subplot(gs[1, 0])
-    im = ax1.pcolormesh(t, f[f_mask]/1000, Sdb[f_mask, :],
+    im = ax1.pcolormesh(t_plot, f[f_mask]/1000, Sdb_plot,
                         shading="gouraud", cmap="magma", vmin=-80, vmax=0)
     ax1.set_xlabel("Time (s)"); ax1.set_ylabel("Frequency (kHz)")
     ax1.set_title("Spectrogram (N=2048, hop=512)", fontweight="bold")
@@ -176,7 +182,7 @@ def plot_results(y, f, t, Sdb, peaks, f_mask, scores, best_offsets, matches, pre
 
     # ── 3. Constellation ─────────────────────────────────────────────────────
     ax2 = fig.add_subplot(gs[1, 1])
-    im2 = ax2.pcolormesh(t, f[f_mask]/1000, Sdb[f_mask, :],
+    im2 = ax2.pcolormesh(t_plot, f[f_mask]/1000, Sdb_plot,
                          shading="gouraud", cmap="magma", vmin=-80, vmax=0)
     pt = [t[ti] for ti, fi in peaks if fi < np.sum(f_mask)]
     pf = [f[fi]/1000 for ti, fi in peaks if fi < np.sum(f_mask)]
@@ -197,7 +203,8 @@ def plot_results(y, f, t, Sdb, peaks, f_mask, scores, best_offsets, matches, pre
         inner_gs = gridspec.GridSpecFromSubplotSpec(
             1, n_songs, subplot_spec=gs[2, :], wspace=0.4)
         ax3.set_visible(False)
-        for idx, sname in enumerate(sorted(matches.keys())):
+        top_matches = sorted(matches.keys(), key=lambda s: scores.get(s, 0), reverse=True)[:6]
+        for idx, sname in enumerate(top_matches):
             offsets = matches[sname]
             ax_h = fig.add_subplot(inner_gs[idx])
             if not offsets:
@@ -282,6 +289,9 @@ def main():
         )
 
         if uploaded is not None:
+            if uploaded.size > 15 * 1024 * 1024:
+                st.error("Please upload a WAV file smaller than 15 MB.")
+                st.stop()
             data = uploaded.read()
             st.audio(data, format="audio/wav")
 
@@ -330,64 +340,7 @@ def main():
                 st.pyplot(fig, width='stretch')
                 plt.close(fig)
 
-            # Individual plot tabs
-            tab1, tab2, tab3 = st.tabs(["Spectrogram", "Constellation", "Offset Histograms"])
-
-            with tab1:
-                fig1, ax1 = plt.subplots(figsize=(12, 4))
-                im = ax1.pcolormesh(t, f[f_mask]/1000, Sdb[f_mask, :],
-                                    shading="gouraud", cmap="magma", vmin=-80, vmax=0)
-                ax1.set_xlabel("Time (s)"); ax1.set_ylabel("Frequency (kHz)")
-                ax1.set_title(f'Spectrogram of query clip', fontweight="bold")
-                plt.colorbar(im, ax=ax1, label="dB")
-                st.pyplot(fig1, width='stretch')
-                plt.close(fig1)
-                st.caption("Each column is one STFT window (N=2048 samples, ~93 ms). "
-                           "Brighter = more energy at that frequency at that time.")
-
-            with tab2:
-                fig2, ax2 = plt.subplots(figsize=(12, 4))
-                im2 = ax2.pcolormesh(t, f[f_mask]/1000, Sdb[f_mask, :],
-                                     shading="gouraud", cmap="magma", vmin=-80, vmax=0)
-                pt = [t[ti] for ti, fi in peaks if fi < np.sum(f_mask)]
-                pf = [f[fi]/1000 for ti, fi in peaks if fi < np.sum(f_mask)]
-                ax2.scatter(pt, pf, s=8, c="cyan", linewidths=0, zorder=3)
-                ax2.set_xlabel("Time (s)"); ax2.set_ylabel("Frequency (kHz)")
-                ax2.set_title(f"Constellation: {len(peaks)} local-maxima peaks", fontweight="bold")
-                plt.colorbar(im2, ax=ax2, label="dB")
-                st.pyplot(fig2, width='stretch')
-                plt.close(fig2)
-                st.caption("Cyan dots = strongest time-frequency peaks. Each will be "
-                           "paired into hashes (f1, f2, Δt) for matching.")
-
-            with tab3:
-                n = len(matches)
-                if n == 0:
-                    st.warning("No hashes matched the database.")
-                else:
-                    cols_per_row = 4
-                    song_list = sorted(matches.keys())
-                    for row_start in range(0, len(song_list), cols_per_row):
-                        row_songs = song_list[row_start:row_start + cols_per_row]
-                        cols = st.columns(len(row_songs))
-                        for col, sname in zip(cols, row_songs):
-                            offsets = matches[sname]
-                            fig_h, ax_h = plt.subplots(figsize=(3.5, 2.5))
-                            if offsets:
-                                bins = np.arange(min(offsets), max(offsets)+2)
-                                counts, _ = np.histogram(offsets, bins=bins)
-                                color = "#2ecc71" if sname == pred else "#3498db"
-                                ax_h.bar(bins[:-1], counts, width=1, color=color, edgecolor="none")
-                                if sname == pred:
-                                    ax_h.axvline(best_offsets.get(sname, 0), color="red", lw=1.5)
-                            ax_h.set_title(sname.replace("_"," "), fontsize=7, fontweight="bold")
-                            ax_h.set_xlabel("Offset (frames)", fontsize=6)
-                            ax_h.set_ylabel("Count", fontsize=6)
-                            ax_h.tick_params(labelsize=6)
-                            fig_h.tight_layout()
-                            col.pyplot(fig_h, width='stretch')
-                            plt.close(fig_h)
-                st.caption("A true match produces a sharp spike; wrong songs stay flat and low.")
+            st.info("Detailed tab plots disabled on Streamlit Cloud to reduce memory usage.")
 
     # ══════════════════════════════════════════════════════════════════════════
     else:
